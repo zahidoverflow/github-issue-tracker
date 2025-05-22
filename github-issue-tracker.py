@@ -6,6 +6,7 @@ Required dependency: requests
 import sys
 import subprocess
 import importlib.util
+import json
 
 # Check if requests is installed, install if not
 if importlib.util.find_spec("requests") is None:
@@ -17,15 +18,25 @@ import requests
 import time
 import os
 import re
-import json
+
+# Load .env file manually (no python-dotenv)
+dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+if os.path.exists(dotenv_path):
+    with open(dotenv_path) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            key, val = line.split('=', 1)
+            os.environ.setdefault(key, val)
 
 # -----------------------Configuration-----------------------
-# Telegram Bot Token (get from BotFather)
-TELEGRAM_BOT_TOKEN = ""
-# Telegram Chat ID (ID of the chat to send messages to)
-TELEGRAM_CHAT_ID = ""
-# GitHub Personal Access Token (optional, for higher rate limits)
-GITHUB_TOKEN = ""
+# Telegram Bot Token (from environment variable)
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+# Telegram Chat ID (from environment variable)
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+# GitHub Personal Access Token (from environment variable)
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 # Path to the file containing the list of GitHub repositories
 GITHUB_REPOS_FILE = "github_repo_links.txt"
 # Path to the file for storing last known issue IDs
@@ -118,7 +129,7 @@ def send_telegram_message(token, chat_id, message):
         }
         response = requests.post(url, data=data)
         response.raise_for_status()
-        print(f"✅ Found new issue(s): Notification sent")
+        print(f"*** New issue(s): Sent to telegram bot")
     except Exception as e:
         print(f"Error sending message: {e}")
         # Try again without parse_mode if there was an error
@@ -132,7 +143,7 @@ def send_telegram_message(token, chat_id, message):
             data["text"] = plain_text
             response = requests.post(url, data=data)
             response.raise_for_status()
-            print("Notification sent successfully with plain text.")
+            print("*** New issue(s): Sent to telegram bot with plain text")
         except Exception as e2:
             print(f"Error sending plain text message: {e2}")
 
@@ -173,7 +184,7 @@ def main():
             if last_known_issues[repo_url] is None:
                 # First run - just record the latest issue number
                 last_known_issues[repo_url] = latest_issue_number
-                print(f"Monitoring: {repo_url} | Latest issue: #{latest_issue_number}")
+                print(f"Monitoring: {repo_url}/issues > latest issue #{latest_issue_number}")
             elif latest_issue_number > last_known_issues[repo_url]:
                 # New issues found since last check
                 new_issues = [issue for issue in issues if issue['number'] > last_known_issues[repo_url]]
@@ -183,7 +194,7 @@ def main():
                 
                 if new_issues:
                     # Prepare and send notification
-                    message_lines = [f"<b>✅ Found new issue(s): {repo_url}/issues</b>"]
+                    message_lines = [f"<b>✅ New issue(s): {repo_url}/issues</b>"]
                     for issue in new_issues:
                         message_lines.append(f"- {issue['title']}")
                     
@@ -192,12 +203,10 @@ def main():
                 
                 # Update last known issue number
                 last_known_issues[repo_url] = latest_issue_number
-                print(f"Updated latest issue number for {repo_url} to #{latest_issue_number}")
+                print(f"Updated latest issue number for {repo_url}/issues to #{latest_issue_number}")
             else:
                 print(f"No new issues: {repo_url}/issues > latest is still #{last_known_issues[repo_url]}")
-        elif issues is not None:
-            print(f"No open issues: {repo_url}/issues")
-        else:
+        elif issues is None:
             print(f"Could not fetch issues: {repo_url}/issues")
 
         # Save last known issue IDs after each repository check
