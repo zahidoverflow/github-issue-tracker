@@ -220,6 +220,11 @@ def main():
             time.sleep(REQUEST_DELAY - elapsed_time)
         # If processing took more than 1 second, don't wait at all
         # This ensures we never exceed 1 request per second, but also don't add unnecessary delay
+        
+        # After processing the last repo, sleep for 60 seconds
+        if repo_index == 0:
+            print("Processed all repositories. Sleeping for 60 seconds...")
+            time.sleep(60)
 
 if __name__ == "__main__":
     main()
